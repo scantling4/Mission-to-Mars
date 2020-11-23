@@ -3,11 +3,14 @@ from splinter import Browser
 from bs4 import BeautifulSoup as soup
 import pandas as pd
 import datetime as dt
+import chromedriver_autoinstaller
 
 
 def scrape_all():
     # Initiate headless driver for deployment
-    browser = Browser("chrome", executable_path="chromedriver", headless=True)
+    chromedriver_autoinstaller.install() 
+    executable_path = {'executable_path': '/Users/katherinescantling/anaconda3/envs/PythonData/lib/python3.7/site-packages/chromedriver_autoinstaller/86/chromedriver'}
+    browser = Browser('chrome', **executable_path, headless=True)
 
     news_title, news_paragraph = mars_news(browser)
 
@@ -17,7 +20,8 @@ def scrape_all():
         "news_paragraph": news_paragraph,
         "featured_image": featured_image(browser),
         "facts": mars_facts(),
-        "last_modified": dt.datetime.now()
+        "last_modified": dt.datetime.now(),
+        "hemispheres": hemisphere_data(browser)
     }
 
     # Stop webdriver and return data
@@ -51,6 +55,7 @@ def mars_news(browser):
         return None, None
 
     return news_title, news_p
+
 
 
 def featured_image(browser):
@@ -100,7 +105,53 @@ def mars_facts():
     # Convert dataframe into HTML format, add bootstrap
     return df.to_html(classes="table table-striped")
 
-if __name__ == "__main__":
+def hemisphere_data(browser):
+    # 1. Use browser to visit the URL 
+    url = 'https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars'
+    browser.visit(url)
+
+    # 2. Create a list to hold the images and titles.
+    hemisphere_image_urls = []
+    links = []      
+
+    # 3. Write code to retrieve the image urls and titles for each hemisphere.
+    html = browser.html
+    hemi_soup = soup(html, 'html.parser')
+    base_url = "https://astrogeology.usgs.gov"
+
+    try:
+        div_result = hemi_soup.find('div', class_='result-list')
+        div_items = div_result.findAll('div', class_='item')
+
+        for div_item in div_items:
+            hemispheres = {}
+            div_descript = div_item.find('div', class_='description')
+    
+            title = div_descript.find('h3').text
+            hemispheres['title'] = title
+        
+            href = div_item.find("a", class_='itemLink product-item')['href']
+            links.append(base_url + href)
+        
+            for link in links:
+                browser.visit(link)
+                html = browser.html
+                img_soup = soup(html, 'html.parser')
+                div_downloads = img_soup.find('div', class_='downloads')
+            
+                img_url_rel = div_downloads.find('a', target= '_blank')['href']
+                img_url = img_url_rel
+                hemispheres['img_url'] = img_url
+        
+            hemisphere_image_urls.append(hemispheres)
+
+    except BaseException:
+        return None
+        
+    return hemisphere_image_urls
+
+if __name__ == '__main__':
+    app.run(debug=True)
 
     # If running as script, print scraped data
     print(scrape_all())
